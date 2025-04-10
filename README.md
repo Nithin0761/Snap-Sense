@@ -25,3 +25,63 @@ Install required packages:
 
 ```bash
 pip install opencv-python numpy pillow pyttsx3 SpeechRecognition sounddevice transformers
+
+
+▶️ How to Run
+Make sure model.pkl and processor.pkl are available in the same folder.
+
+Run the script:
+
+bash
+Copy
+Edit
+python your_script_name.py
+Speak your command when prompted:
+
+Say "take a picture" to use your webcam
+
+Say "upload image" to manually upload an image
+
+🧪 Sample Commands
+"take a picture"
+
+"upload image"
+
+"click picture"
+
+"upload file"
+
+🖼️ Sample Output
+For an image of a dog running on the beach:
+
+bash
+Copy
+Edit
+🖼 Generating caption from: captured_image.jpg
+🧾 Caption: a dog running on the beach
+For an uploaded image of a bowl of fruit:
+
+bash
+Copy
+Edit
+🖼 Generating caption from: C:/Users/User/Desktop/fruit_bowl.jpg
+🧾 Caption: a bowl full of assorted fruits
+Voice output:
+
+"a bowl full of assorted fruits"
+
+📁 Project Files
+your_script_name.py – Main Python script
+
+model.pkl – Pickled vision-language model
+
+processor.pkl – Pickled image processor (e.g., feature extractor or tokenizer)
+
+captured_image.jpg – Temporarily saved image from webcam
+
+📌 Notes
+If you face webcam issues, make sure your camera index is correct (cv2.VideoCapture(0) or 1).
+
+Tested with models from Hugging Face (like BLIP/ViT-based captioning models).
+
+Runs fully offline (once the .pkl files are saved locally).
