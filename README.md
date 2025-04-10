@@ -23,7 +23,7 @@ It uses:
 
 Install required packages:
 
-```bash
+
 pip install opencv-python numpy pillow pyttsx3 SpeechRecognition sounddevice transformers
 
 
@@ -54,16 +54,12 @@ Say "upload image" to manually upload an image
 🖼️ Sample Output
 For an image of a dog running on the beach:
 
-bash
-Copy
-Edit
+
 🖼 Generating caption from: captured_image.jpg
 🧾 Caption: a dog running on the beach
 For an uploaded image of a bowl of fruit:
 
-bash
-Copy
-Edit
+
 🖼 Generating caption from: C:/Users/User/Desktop/fruit_bowl.jpg
 🧾 Caption: a bowl full of assorted fruits
 Voice output:
