@@ -81,3 +81,5 @@ If you face webcam issues, make sure your camera index is correct (cv2.VideoCapt
 Tested with models from Hugging Face (like BLIP/ViT-based captioning models).
 
 Runs fully offline (once the .pkl files are saved locally).
+
+You can find the model here: https://drive.google.com/file/d/1vLjZS1UPvGAIJVgCas_JfwoEVHoIdKzY/view?usp=drive_link
