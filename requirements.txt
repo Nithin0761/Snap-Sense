@@ -1,0 +1,1 @@
+pip install streamlit transformers==4.37.2 torch torchvision torchaudio pyttsx3 SpeechRecognition opencv-python pillow
