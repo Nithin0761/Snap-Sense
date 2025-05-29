@@ -1,10 +1,11 @@
 import streamlit as st
 import cv2
 from PIL import Image
-import pickle
 import pyttsx3
 import speech_recognition as sr
 import time
+import torch
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
 # Page configuration
 st.set_page_config(
@@ -93,10 +94,9 @@ def get_theme_css(theme):
 @st.cache_resource
 def load_model():
     try:
-        with open('processor.pkl', 'rb') as processor_file:
-            processor = pickle.load(processor_file)
-        with open('model.pkl', 'rb') as model_file:
-            model = pickle.load(model_file)
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+        model.eval()
         return processor, model
     except Exception as e:
         st.error(f"Error loading model: {str(e)}. Using dummy caption mode.")
@@ -134,8 +134,6 @@ def generate_caption(image, processor, model):
         return "Dummy caption: A sample image description."
     try:
         inputs = processor(images=image, return_tensors='pt')
-        if isinstance(inputs, tuple):
-            inputs = inputs[0]
         output_ids = model.generate(**inputs)
         caption = processor.decode(output_ids[0], skip_special_tokens=True)
         return caption
@@ -156,6 +154,35 @@ def take_picture():
         return Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     return None
 
+def handle_command(command, processor, model):
+    if 'take picture' in command:
+        st.session_state.image = take_picture()
+        if st.session_state.image:
+            caption = generate_caption(st.session_state.image, processor, model)
+            if caption:
+                st.session_state.caption = caption
+                st.session_state.history.append({"image": st.session_state.image, "caption": caption})
+                speak(f"Picture taken. Caption generated: {caption}")
+            else:
+                speak("Picture taken, but caption generation failed.")
+            st.success("Picture taken successfully!")
+    elif 'upload image' in command:
+        speak("Please upload an image using the file uploader")
+        st.info("Please upload an image using the file uploader")
+    elif 'generate caption' in command and st.session_state.image:
+        caption = generate_caption(st.session_state.image, processor, model)
+        if caption:
+            st.session_state.caption = caption
+            st.session_state.history.append({"image": st.session_state.image, "caption": caption})
+            speak(f"Caption generated: {caption}")
+            st.success("Caption generated!")
+    elif 'speak caption' in command and st.session_state.caption:
+        speak(f"Caption: {st.session_state.caption}")
+        st.success("Speaking caption...")
+    elif 'stop listening' in command:
+        st.session_state.listening = False
+        speak("Stopped listening")
+
 # =========================
 # === Main App Layout  ===
 # =========================
@@ -167,7 +194,7 @@ def main():
     theme = st.sidebar.selectbox("Choose Theme", ["Dark", "Light"], index=0 if st.session_state.theme == "Dark" else 1)
     if theme != st.session_state.theme:
         st.session_state.theme = theme
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown(get_theme_css(st.session_state.theme), unsafe_allow_html=True)
     st.title("📸 SnapSense - Image Captioning")
@@ -176,15 +203,19 @@ def main():
     st.session_state.setdefault('caption', None)
     st.session_state.setdefault('listening', False)
     st.session_state.setdefault('history', [])
+    st.session_state.setdefault('continuous', False)
 
     processor, model = load_model()
-    speak("Welcome to SnapSense. Say 'take picture', 'upload image', 'generate caption', or 'speak caption' to begin.")
+
+    if 'welcome_done' not in st.session_state:
+        speak("Welcome to SnapSense. Say 'take picture', 'upload image', 'generate caption', or 'speak caption' to begin.")
+        st.session_state.welcome_done = True
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col1:
         st.markdown("### 🎤 Voice Commands")
-        st.markdown('<div class="command-list">*Available Commands:*<br>'
+        st.markdown('<div class="command-list">*Available Commands:*<br>' 
                     "- 'Take picture'<br>"
                     "- 'Upload image'<br>"
                     "- 'Generate caption'<br>"
@@ -195,58 +226,40 @@ def main():
 
         if st.button("🎤 Start Voice Command"):
             st.session_state.listening = True
-            while st.session_state.listening:
-                command = listen_for_command()
-                if command:
-                    if 'take picture' in command:
-                        st.session_state.image = take_picture()
-                        if st.session_state.image:
-                            speak("Picture taken successfully")
-                            st.success("Picture taken successfully!")
-                    elif 'upload image' in command:
-                        speak("Please upload an image using the file uploader")
-                        st.info("Please upload an image using the file uploader")
-                    elif 'generate caption' in command and st.session_state.image:
-                        caption = generate_caption(st.session_state.image, processor, model)
-                        if caption:
-                            st.session_state.caption = caption
-                            st.session_state.history.append({"image": st.session_state.image, "caption": caption})
-                            speak(f"Caption generated: {caption}")
-                            st.success("Caption generated!")
-                    elif 'speak caption' in command and st.session_state.caption:
-                        speak(f"Caption: {st.session_state.caption}")
-                        st.success("Speaking caption...")
-                    elif 'stop listening' in command:
-                        st.session_state.listening = False
-                        speak("Stopped listening")
-                        break
-                if not st.session_state.continuous:
-                    break
-                time.sleep(1)
+            command = listen_for_command()
+            if command:
+                handle_command(command, processor, model)
 
     with col2:
         st.markdown("### 📷 Image Input")
         if st.button("📸 Take Picture"):
             st.session_state.image = take_picture()
             if st.session_state.image:
-                speak("Picture taken successfully")
-                st.success("Picture taken successfully!")
-
-        uploaded_file = st.file_uploader("Or upload an image", type=['jpg', 'jpeg', 'png'])
-        if uploaded_file:
-            st.session_state.image = Image.open(uploaded_file).convert('RGB')
-            speak("Image uploaded successfully")
-            st.success("Image uploaded successfully!")
-
-        if st.session_state.image:
-            st.image(st.session_state.image, use_column_width=True)
-            if st.button("🔍 Generate Caption"):
                 caption = generate_caption(st.session_state.image, processor, model)
                 if caption:
                     st.session_state.caption = caption
                     st.session_state.history.append({"image": st.session_state.image, "caption": caption})
                     speak(f"Caption generated: {caption}")
-                    st.success("Caption generated!")
+                    st.success("Picture taken and caption generated successfully!")
+                else:
+                    speak("Caption generation failed after taking picture.")
+                    st.error("Caption generation failed.")
+
+        uploaded_file = st.file_uploader("Or upload an image", type=['jpg', 'jpeg', 'png'])
+        if uploaded_file:
+            st.session_state.image = Image.open(uploaded_file).convert('RGB')
+            caption = generate_caption(st.session_state.image, processor, model)
+            if caption:
+                st.session_state.caption = caption
+                st.session_state.history.append({"image": st.session_state.image, "caption": caption})
+                speak(f"Caption generated: {caption}")
+                st.success("Image uploaded and caption generated successfully!")
+            else:
+                speak("Caption generation failed after image upload.")
+                st.error("Caption generation failed.")
+
+        if st.session_state.image:
+            st.image(st.session_state.image, use_container_width=True)
         else:
             st.info("No image selected. Take a picture or upload an image.")
 
@@ -272,14 +285,14 @@ def main():
                         st.session_state.image = item['image']
                         st.session_state.caption = item['caption']
                         speak(f"Loaded caption {idx+1}: {st.session_state.caption}")
-                        st.experimental_rerun()
+                        st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
             if st.button("🗑️ Clear Caption History"):
                 st.session_state.history = []
                 speak("Caption history cleared")
                 st.success("Caption history cleared!")
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.info("No caption history available.")
 
@@ -289,7 +302,7 @@ def main():
         st.session_state.history = []
         st.session_state.listening = False
         speak("Application reset")
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("---")
     st.markdown("Made with ❤ using Streamlit")
